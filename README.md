@@ -1,4 +1,4 @@
-# YX37 Companion (Android)
+# YX37 Companion (Android) - v1.2.1
 
 Ứng dụng Android điều khiển phần cứng và tinh chỉnh Equalizer (EQ) trực tiếp cho tai nghe **YX37** qua kết nối Bluetooth.
 
@@ -14,7 +14,7 @@
   - **Treble Boost**: Tăng độ chi tiết và sáng của dải cao.
   - **Vocal**: Tôn giọng hát và đàm thoại rõ ràng.
   - **Gaming**: Tối ưu âm thanh không gian và tiếng bước chân.
-  - **Custom**: Tùy chỉnh tự do từng thanh gạt từ -8 dB đến +8 dB.
+- **Quản lý đa cấu hình tùy chỉnh (Custom Profiles)**: Tạo mới không giới hạn nhiều cấu hình tùy chỉnh cá nhân, đổi tên, và xóa dễ dàng ngay trên giao diện.
 - **Tự động lưu & Khôi phục**: Lưu lại trạng thái tùy chỉnh của bạn và tự động nạp lại mỗi khi tai nghe kết nối.
 - **Giao diện Material 3 hiện đại**: Xây dựng hoàn toàn bằng Jetpack Compose, hiển thị trực quan trạng thái kết nối Bluetooth.
 

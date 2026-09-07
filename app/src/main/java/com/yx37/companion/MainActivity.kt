@@ -287,8 +287,15 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                             text = "🎧  YX37 COMPANION",
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.1.sp,
-                            fontSize = 17.sp,
+                            fontSize = 16.sp,
                             color = CyberCyan
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "v1.2.1",
+                            fontSize = 10.sp,
+                            color = TextSecondary,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 },
@@ -824,6 +831,17 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "YX37 Companion v1.2.1 • By Krist-OVSL",
+                fontSize = 10.sp,
+                color = TextSecondary.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            )
         }
     }
 
