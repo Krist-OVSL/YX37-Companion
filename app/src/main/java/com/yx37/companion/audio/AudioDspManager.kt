@@ -52,7 +52,12 @@ object AudioDspManager {
             val prefs = PreferencesManager(context)
             isEqMasterEnabled = prefs.isEqEnabled
             isHeadsetConnected = prefs.isConnected
-            currentGains = prefs.getCustomEqBands(hardwareBandsCount)
+            val selected = prefs.selectedPreset
+            if (selected.equals("Tùy chỉnh", ignoreCase = true)) {
+                currentGains = prefs.getCustomEqBands(hardwareBandsCount)
+            } else {
+                currentGains = calculatePresetGains(selected, hardwareBandFreqs)
+            }
 
             // Try gentle global session init without throwing
             initGlobalSession(context)
@@ -86,10 +91,21 @@ object AudioDspManager {
     fun applyGains(gains: FloatArray, context: Context) {
         try {
             currentGains = gains.clone()
-            PreferencesManager(context).saveCustomEqBands(currentGains)
             applyToAllActiveSessions()
         } catch (t: Throwable) {
             Log.e(TAG, "Error applying gains", t)
+        }
+    }
+
+    fun applyCustomGains(gains: FloatArray, context: Context) {
+        try {
+            currentGains = gains.clone()
+            val prefs = PreferencesManager(context)
+            prefs.selectedPreset = "Tùy chỉnh"
+            prefs.updateActiveProfileGains(currentGains, hardwareBandsCount)
+            applyToAllActiveSessions()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Error applying custom gains", t)
         }
     }
 
@@ -98,7 +114,8 @@ object AudioDspManager {
         try {
             val prefs = PreferencesManager(context)
             prefs.selectedPreset = presetName
-            applyGains(newGains, context)
+            currentGains = newGains.clone()
+            applyToAllActiveSessions()
         } catch (t: Throwable) {
             Log.e(TAG, "Error applying preset", t)
         }

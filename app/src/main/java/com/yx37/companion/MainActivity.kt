@@ -19,6 +19,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yx37.companion.audio.AudioDspManager
 import com.yx37.companion.bluetooth.BluetoothMonitor
+import com.yx37.companion.data.CustomProfile
 import com.yx37.companion.data.PreferencesManager
 import com.yx37.companion.data.Yx37DeviceState
 import com.yx37.companion.services.AudioDspService
@@ -132,6 +135,17 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
     val numBands = AudioDspManager.hardwareBandsCount
     val hardwareFreqs = AudioDspManager.hardwareBandFreqs
 
+    // Custom Profiles Management State
+    val customProfiles = remember {
+        mutableStateListOf<CustomProfile>().apply {
+            addAll(prefs.getCustomProfiles(numBands))
+        }
+    }
+    var activeProfileId by remember { mutableStateOf(prefs.activeCustomProfileId) }
+    var showCreateProfileDialog by remember { mutableStateOf(false) }
+    var newProfileNameInput by remember { mutableStateOf("") }
+    var profileToDelete by remember { mutableStateOf<CustomProfile?>(null) }
+
     fun formatFreq(hz: Int): String {
         return if (hz >= 1000) {
             val k = hz / 1000f
@@ -143,8 +157,13 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
 
     val currentBands = remember {
         mutableStateListOf<Float>().apply {
-            val saved = prefs.getCustomEqBands(numBands)
-            saved.forEach { add(it) }
+            val initialGains = if (selectedPreset.equals("Tùy chỉnh", ignoreCase = true)) {
+                val active = prefs.getActiveCustomProfile(numBands)
+                active.gains.toFloatArray()
+            } else {
+                AudioDspManager.calculatePresetGains(selectedPreset, hardwareFreqs)
+            }
+            initialGains.forEach { add(it) }
         }
     }
 
@@ -267,7 +286,8 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         Text(
                             text = "🎧  YX37 COMPANION",
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp,
+                            letterSpacing = 1.1.sp,
+                            fontSize = 17.sp,
                             color = CyberCyan
                         )
                     }
@@ -278,7 +298,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         onClick = {
                             isManuallyRefreshing = true
                             refreshState()
-                            Toast.makeText(context, "Đã làm mới trạng thái tai nghe!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Đã làm mới trạng thái!", Toast.LENGTH_SHORT).show()
                             isManuallyRefreshing = false
                         }
                     ) {
@@ -293,16 +313,16 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                     // Connection Status Badge
                     Box(
                         modifier = Modifier
-                            .padding(end = 16.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .padding(end = 12.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(if (isConnected) NeonGreen.copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.2f))
-                            .border(1.dp, if (isConnected) NeonGreen else Color.Gray, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .border(1.dp, if (isConnected) NeonGreen else Color.Gray, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = if (isConnected) "ĐÃ KẾT NỐI" else "CHƯA KẾT NỐI",
                             color = if (isConnected) NeonGreen else Color.LightGray,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -316,34 +336,33 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Permission Alert Banner for Android 12+
             if (!hasPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.elevatedCardColors(containerColor = NeonRed.copy(alpha = 0.15f)),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = NeonRed)
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = NeonRed, modifier = Modifier.size(18.dp))
                             Text(
                                 text = "Cần cấp quyền Bluetooth (Nearby Devices)",
                                 fontWeight = FontWeight.Bold,
                                 color = NeonRed,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             )
                         }
                         Text(
-                            text = "Để ứng dụng nhận diện chính xác tai nghe YX37 và đọc thời lượng pin, vui lòng cho phép quyền 'Thiết bị ở gần'.",
-                            fontSize = 12.sp,
-                            color = TextPrimary,
-                            lineHeight = 16.sp
+                            text = "Để ứng dụng nhận diện chính xác tai nghe YX37 và đọc pin, vui lòng cấp quyền 'Thiết bị ở gần'.",
+                            fontSize = 11.sp,
+                            color = TextPrimary
                         )
                         Button(
                             onClick = {
@@ -355,21 +374,22 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                                 )
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = NeonRed),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Text("Cấp quyền ngay", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Cấp quyền ngay", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                 }
             }
 
-            // Card 1: Battery Telemetry & Connection Status
+            // Card 1: Compact Battery & Connection Status
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = DarkSurface),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -378,7 +398,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         Column {
                             Text(
                                 text = "Thời lượng Pin Tai nghe",
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 color = TextSecondary,
                                 fontWeight = FontWeight.Medium
                             )
@@ -391,11 +411,12 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         Icon(
                             imageVector = if (batteryLevel > 20) Icons.Default.BatteryChargingFull else Icons.Default.BatteryAlert,
                             contentDescription = null,
-                            tint = if (batteryLevel > 20) NeonGreen else if (batteryLevel >= 0) NeonRed else Color.Gray
+                            tint = if (batteryLevel > 20) NeonGreen else if (batteryLevel >= 0) NeonRed else Color.Gray,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         verticalAlignment = Alignment.Bottom,
@@ -403,34 +424,34 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                     ) {
                         Text(
                             text = if (batteryLevel in 0..100) "$batteryLevel%" else "--%",
-                            fontSize = 42.sp,
+                            fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (batteryLevel > 20) TextPrimary else if (batteryLevel >= 0) NeonRed else Color.LightGray
                         )
-                        Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                        Column(modifier = Modifier.padding(bottom = 4.dp)) {
                             Text(
                                 text = if (isConnected) "• Đang kết nối A2DP • Auto-Refresh 3s" else "• Chưa kết nối",
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 color = if (isConnected) NeonGreen else TextSecondary,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = statusMessage,
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 color = TextSecondary
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     val progress = if (batteryLevel in 0..100) batteryLevel / 100f else 0f
                     LinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
                         color = if (batteryLevel > 20) NeonGreen else NeonRed,
                         trackColor = DarkSurfaceVariant
                     )
@@ -441,30 +462,30 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = DarkSurface),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     // Lock Notice when headset is disconnected
                     if (!isConnected) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(NeonRed.copy(alpha = 0.12f))
-                                .border(1.dp, NeonRed.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                .padding(12.dp)
+                                .border(1.dp, NeonRed.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                .padding(8.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.Lock, contentDescription = null, tint = NeonRed, modifier = Modifier.size(18.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = NeonRed, modifier = Modifier.size(16.dp))
                                 Text(
                                     text = "Vui lòng kết nối tai nghe YX37 để kích hoạt bộ chỉnh EQ.",
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     color = NeonRed,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
 
                     // Master EQ Switch Row
@@ -476,7 +497,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Equalizer Âm Thanh YX37",
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isConnected) TextPrimary else TextSecondary
                             )
@@ -485,9 +506,8 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                                     "Đang áp dụng EQ cho Spotify, YouTube & toàn hệ thống."
                                 else
                                     "Đang tắt EQ (Âm thanh mộc của tai nghe).",
-                                fontSize = 12.sp,
-                                color = if (isEqEnabled) NeonGreen else TextSecondary,
-                                lineHeight = 16.sp
+                                fontSize = 11.sp,
+                                color = if (isEqEnabled) NeonGreen else TextSecondary
                             )
                         }
 
@@ -507,22 +527,23 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Preset Chips Row
+                    // Preset Chips Rows
                     Text(
                         text = "Cấu hình âm thanh (Presets):",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = CyberCyan
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
+                    // Row 1: Flat, Bass Boost, Treble Boost
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        presets.take(4).forEach { p ->
+                        presets.take(3).forEach { p ->
                             val isSelected = selectedPreset.equals(p, ignoreCase = true)
                             Box(
                                 modifier = Modifier
@@ -531,12 +552,13 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                                     .background(if (isSelected) CyberCyan else DarkSurfaceVariant)
                                     .clickable(enabled = isConnected && isEqEnabled) {
                                         selectedPreset = p
+                                        prefs.selectedPreset = p
                                         val newGains = AudioDspManager.applyPreset(p, context)
                                         for (idx in newGains.indices) {
                                             if (idx < currentBands.size) currentBands[idx] = newGains[idx]
                                         }
                                     }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 7.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -549,29 +571,40 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(5.dp))
 
+                    // Row 2: Vocal, Gaming, Tùy chỉnh
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        presets.drop(4).forEach { p ->
+                        presets.drop(3).forEach { p ->
                             val isSelected = selectedPreset.equals(p, ignoreCase = true)
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) CyberCyan else DarkSurfaceVariant)
+                                    .background(if (isSelected) (if (p == "Tùy chỉnh") NeonGreen else CyberCyan) else DarkSurfaceVariant)
                                     .clickable(enabled = isConnected && isEqEnabled) {
                                         selectedPreset = p
-                                        if (!p.equals("Tùy chỉnh", ignoreCase = true)) {
+                                        prefs.selectedPreset = p
+                                        if (p.equals("Tùy chỉnh", ignoreCase = true)) {
+                                            // Restore active custom profile bands WITHOUT wiping them!
+                                            val active = prefs.getActiveCustomProfile(numBands)
+                                            activeProfileId = active.id
+                                            prefs.activeCustomProfileId = active.id
+                                            for (idx in active.gains.indices) {
+                                                if (idx < currentBands.size) currentBands[idx] = active.gains[idx]
+                                            }
+                                            AudioDspManager.applyGains(currentBands.toFloatArray(), context)
+                                        } else {
                                             val newGains = AudioDspManager.applyPreset(p, context)
                                             for (idx in newGains.indices) {
                                                 if (idx < currentBands.size) currentBands[idx] = newGains[idx]
                                             }
                                         }
                                     }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 7.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -584,45 +617,132 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Title for Hardware Sliders
+                    // Custom Profiles Management (Always visible or highlighted when in Custom mode)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Các Cần Gạt Tần Số Phần Cứng ($numBands dải tần):",
-                            fontSize = 13.sp,
+                            text = "Danh sách tùy chỉnh cá nhân:",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonGreen
+                        )
+                        TextButton(
+                            enabled = isConnected && isEqEnabled,
+                            onClick = {
+                                newProfileNameInput = "Tùy chỉnh ${customProfiles.size + 1}"
+                                showCreateProfileDialog = true
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            modifier = Modifier.height(26.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = if (isConnected && isEqEnabled) NeonGreen else Color.Gray, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Tạo mới", fontSize = 11.sp, color = if (isConnected && isEqEnabled) NeonGreen else Color.Gray, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(3.dp))
+
+                    // Horizontal scrollable list of custom profiles
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(customProfiles) { profile ->
+                            val isProfileActive = selectedPreset.equals("Tùy chỉnh", ignoreCase = true) && (profile.id == activeProfileId)
+
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isProfileActive) NeonGreen.copy(alpha = 0.25f) else DarkSurfaceVariant)
+                                    .border(1.dp, if (isProfileActive) NeonGreen else Color.Transparent, RoundedCornerShape(8.dp))
+                                    .clickable(enabled = isConnected && isEqEnabled) {
+                                        selectedPreset = "Tùy chỉnh"
+                                        prefs.selectedPreset = "Tùy chỉnh"
+                                        activeProfileId = profile.id
+                                        prefs.activeCustomProfileId = profile.id
+                                        for (idx in profile.gains.indices) {
+                                            if (idx < currentBands.size) currentBands[idx] = profile.gains[idx]
+                                        }
+                                        AudioDspManager.applyGains(currentBands.toFloatArray(), context)
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = profile.name,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isProfileActive) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isProfileActive) NeonGreen else TextPrimary
+                                )
+                                if (customProfiles.size > 1 && isProfileActive) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Xóa",
+                                        tint = NeonRed,
+                                        modifier = Modifier
+                                            .size(13.dp)
+                                            .clickable {
+                                                profileToDelete = profile
+                                            }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Hardware Sliders Title Bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Các Cần Gạt Phần Cứng ($numBands dải):",
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isConnected && isEqEnabled) TextPrimary else TextSecondary
                         )
                         TextButton(
                             enabled = isConnected && isEqEnabled,
                             onClick = {
-                                val flat = prefs.resetEqBands(numBands)
+                                val flat = FloatArray(numBands) { 0f }
                                 for (idx in flat.indices) {
                                     if (idx < currentBands.size) currentBands[idx] = flat[idx]
                                 }
-                                selectedPreset = "Flat"
-                                AudioDspManager.applyGains(flat, context)
-                                Toast.makeText(context, "Đã đưa tất cả cần gạt về 0 dB!", Toast.LENGTH_SHORT).show()
-                            }
+                                selectedPreset = "Tùy chỉnh"
+                                prefs.selectedPreset = "Tùy chỉnh"
+                                AudioDspManager.applyCustomGains(flat, context)
+                                val pIdx = customProfiles.indexOfFirst { it.id == activeProfileId }
+                                if (pIdx >= 0) {
+                                    customProfiles[pIdx] = customProfiles[pIdx].copy(gains = flat.toList())
+                                }
+                                Toast.makeText(context, "Đã đưa cần gạt về 0 dB!", Toast.LENGTH_SHORT).show()
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            modifier = Modifier.height(24.dp)
                         ) {
-                            Text("Về 0 dB", fontSize = 12.sp, color = if (isConnected && isEqEnabled) NeonRed else Color.Gray)
+                            Text("Về 0 dB", fontSize = 11.sp, color = if (isConnected && isEqEnabled) NeonRed else Color.Gray)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
 
-                    // Dynamic Sliders rendered based on actual hardware bands
+                    // Compact Hardware Sliders Box
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(DarkSurfaceVariant, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                            .background(DarkSurfaceVariant, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         currentBands.indices.forEach { i ->
                             val freq = if (i < hardwareFreqs.size) formatFreq(hardwareFreqs[i]) else "Band $i"
@@ -630,15 +750,17 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                             val isSliderActive = isConnected && isEqEnabled
 
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(28.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = freq,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (isSliderActive) TextPrimary else Color.DarkGray,
-                                    modifier = Modifier.width(56.dp)
+                                    modifier = Modifier.width(48.dp)
                                 )
 
                                 Slider(
@@ -651,12 +773,17 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                                         }
                                         selectedPreset = "Tùy chỉnh"
                                         prefs.selectedPreset = "Tùy chỉnh"
-                                        AudioDspManager.applyGains(currentBands.toFloatArray(), context)
+                                        AudioDspManager.applyCustomGains(currentBands.toFloatArray(), context)
+                                        // Update in-memory profile list so state stays reactive
+                                        val pIdx = customProfiles.indexOfFirst { it.id == activeProfileId }
+                                        if (pIdx >= 0) {
+                                            customProfiles[pIdx] = customProfiles[pIdx].copy(gains = currentBands.toList())
+                                        }
                                     },
                                     valueRange = -12f..12f,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(28.dp),
+                                        .height(22.dp),
                                     colors = SliderDefaults.colors(
                                         thumbColor = if (gain != 0f && isSliderActive) CyberCyan else if (isSliderActive) Color.LightGray else Color.Gray,
                                         activeTrackColor = if (gain != 0f && isSliderActive) CyberCyan else if (isSliderActive) Color.Gray else Color.DarkGray,
@@ -673,19 +800,19 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                                     fontWeight = FontWeight.Bold,
                                     textAlign = TextAlign.End,
                                     color = if (gain != 0f && isSliderActive) CyberCyan else if (isSliderActive) TextSecondary else Color.DarkGray,
-                                    modifier = Modifier.width(54.dp)
+                                    modifier = Modifier.width(50.dp)
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "ℹ EQ chạy nền liên tục qua dịch vụ hệ thống, không bị tắt khi bạn mở Spotify, YouTube hay chơi game.",
-                        fontSize = 11.sp,
+                        text = "ℹ EQ chạy nền liên tục qua dịch vụ hệ thống cho Spotify, YouTube & Game.",
+                        fontSize = 10.sp,
                         color = TextSecondary,
-                        lineHeight = 15.sp
+                        lineHeight = 13.sp
                     )
                 }
             }
@@ -694,27 +821,27 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = DarkSurface),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Tự động khôi phục cấu hình",
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
                         )
                         Text(
-                            text = "Tự động áp dụng lại cấu hình EQ mỗi khi tai nghe kết nối lại vào điện thoại.",
-                            fontSize = 12.sp,
+                            text = "Tự động áp dụng lại cấu hình EQ mỗi khi tai nghe kết nối lại.",
+                            fontSize = 11.sp,
                             color = TextSecondary,
-                            lineHeight = 16.sp
+                            lineHeight = 15.sp
                         )
                     }
 
@@ -732,5 +859,123 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                 }
             }
         }
+    }
+
+    // Dialog: Create New Custom Profile
+    if (showCreateProfileDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateProfileDialog = false },
+            title = {
+                Text(
+                    text = "Tạo cấu hình tùy chỉnh mới",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Nhập tên cho cấu hình âm thanh của bạn (sẽ lưu lại các vị trí cần gạt hiện tại):",
+                        fontSize = 12.sp,
+                        color = TextSecondary,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = newProfileNameInput,
+                        onValueChange = { newProfileNameInput = it },
+                        singleLine = true,
+                        placeholder = { Text("Ví dụ: Rock, Acoustic, Gaming Pro...", fontSize = 12.sp, color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val name = newProfileNameInput.trim()
+                        if (name.isNotEmpty()) {
+                            val created = prefs.addCustomProfile(
+                                name = name,
+                                gains = currentBands.toFloatArray(),
+                                numBands = numBands
+                            )
+                            customProfiles.clear()
+                            customProfiles.addAll(prefs.getCustomProfiles(numBands))
+                            activeProfileId = created.id
+                            selectedPreset = "Tùy chỉnh"
+                            prefs.selectedPreset = "Tùy chỉnh"
+                            Toast.makeText(context, "Đã tạo: ${created.name}", Toast.LENGTH_SHORT).show()
+                        }
+                        showCreateProfileDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+                ) {
+                    Text("Tạo", color = DarkBackground, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateProfileDialog = false }) {
+                    Text("Hủy", color = Color.Gray, fontSize = 12.sp)
+                }
+            },
+            containerColor = DarkSurface
+        )
+    }
+
+    // Dialog: Confirm Delete Profile
+    if (profileToDelete != null) {
+        val prof = profileToDelete!!
+        AlertDialog(
+            onDismissRequest = { profileToDelete = null },
+            title = {
+                Text(
+                    text = "Xóa cấu hình",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NeonRed
+                )
+            },
+            text = {
+                Text(
+                    text = "Bạn có chắc chắn muốn xóa cấu hình '${prof.name}' không?",
+                    fontSize = 13.sp,
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = prefs.deleteCustomProfile(prof.id, numBands)
+                        customProfiles.clear()
+                        customProfiles.addAll(updated)
+                        activeProfileId = prefs.activeCustomProfileId
+                        val newActive = prefs.getActiveCustomProfile(numBands)
+                        for (idx in newActive.gains.indices) {
+                            if (idx < currentBands.size) currentBands[idx] = newActive.gains[idx]
+                        }
+                        AudioDspManager.applyGains(currentBands.toFloatArray(), context)
+                        profileToDelete = null
+                        Toast.makeText(context, "Đã xóa: ${prof.name}", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonRed)
+                ) {
+                    Text("Xóa", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { profileToDelete = null }) {
+                    Text("Hủy", color = Color.Gray, fontSize = 12.sp)
+                }
+            },
+            containerColor = DarkSurface
+        )
     }
 }
