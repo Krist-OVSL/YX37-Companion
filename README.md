@@ -1,12 +1,12 @@
 # YX37 Companion (Android)
 
-Ứng dụng Android điều khiển phần cứng và tinh chỉnh Equalizer (EQ) trực tiếp cho tai nghe **YX37** qua Bluetooth.
+Ứng dụng Android điều khiển phần cứng và tinh chỉnh Equalizer (EQ) trực tiếp cho tai nghe **YX37** qua kết nối Bluetooth.
 
 ---
 
 ## 🌟 Tính năng nổi bật
 
-- **Điều khiển Hardware EQ trực tiếp**: Giao tiếp trực tiếp với chip DSP của tai nghe qua giao thức JieLi RCSP (Bluetooth RFCOMM/SPP), áp dụng âm sắc tức thì vào phần cứng tai nghe.
+- **Điều khiển Hardware EQ trực tiếp**: Giao tiếp trực tiếp với chip DSP của tai nghe qua giao thức JieLi RCSP (Bluetooth RFCOMM / SPP), áp dụng âm sắc tức thì vào phần cứng tai nghe.
 - **Dynamic Hardware Bands**: Tự động truy vấn và đồng bộ danh sách dải tần (frequencies) thực tế do phần cứng tai nghe hỗ trợ.
 - **Preset âm thanh đa dạng**:
   - **Flat**: Cân bằng nguyên bản.
@@ -22,8 +22,8 @@
 
 ## 📲 Cài đặt
 
-1. Tải file **YX37_Companion.apk** từ mục **[Releases](https://github.com/)** của repository này.
-2. Cài đặt file APK trên điện thoại Android của bạn (Android 8.0+).
+1. Tải file **`YX37_Companion.apk`** từ mục **[Releases](https://github.com/Krist-OVSL/YX37-Companion/releases)** của repository này.
+2. Cài đặt file APK trên điện thoại Android của bạn (hỗ trợ Android 8.0 trở lên).
 3. Mở ứng dụng, cấp quyền **Bluetooth** (Thiết bị ở gần) khi được yêu cầu.
 4. Bật tai nghe YX37 và kết nối Bluetooth, ứng dụng sẽ tự động nhận diện và sẵn sàng điều chỉnh EQ!
 
@@ -37,19 +37,21 @@
 - **Android SDK** API 35 (Build-tools 35.0.0).
 
 ### Lệnh biên dịch:
-`ash
+```bash
 # Clone repository
-git clone <repository_url>
-cd <repository_folder>
+git clone https://github.com/Krist-OVSL/YX37-Companion.git
+cd YX37-Companion
 
 # Build Debug APK
 ./gradlew assembleDebug
 
 # Build Release APK
 ./gradlew assembleRelease
-`
+```
+
 File APK đầu ra sẽ nằm tại:
-pp/build/outputs/apk/release/app-release.apk (hoặc pp-debug.apk)
+- `app/build/outputs/apk/release/app-release.apk`
+- `app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 
