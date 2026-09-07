@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">YX37 Companion</string>
+    <string name="tile_battery_label">YX37 Pin</string>
+    <string name="tile_eq_label">YX37 EQ</string>
+    <string name="status_connected">Đã kết nối</string>
+    <string name="status_disconnected">Đã ngắt kết nối</string>
+</resources>
