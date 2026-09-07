@@ -292,7 +292,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "v1.2.1",
+                            text = "v1.1.0",
                             fontSize = 10.sp,
                             color = TextSecondary,
                             fontWeight = FontWeight.SemiBold
@@ -834,7 +834,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
 
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "YX37 Companion v1.2.1 • By Krist-OVSL",
+                text = "YX37 Companion v1.1.0 • By Krist-OVSL",
                 fontSize = 10.sp,
                 color = TextSecondary.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,

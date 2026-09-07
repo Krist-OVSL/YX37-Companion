@@ -1,4 +1,4 @@
-# YX37 Companion (Android) - v1.2.1
+# YX37 Companion (Android) - v1.1.0
 
 Ứng dụng Android điều khiển phần cứng và tinh chỉnh Equalizer (EQ) trực tiếp cho tai nghe **YX37** qua kết nối Bluetooth.
 
