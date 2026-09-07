@@ -159,13 +159,13 @@ class PreferencesManager(context: Context) {
 
     fun deleteCustomProfile(profileId: String, numBands: Int): List<CustomProfile> {
         val list = getCustomProfiles(numBands).toMutableList()
-        if (list.size <= 1) {
-            // Keep at least one profile
-            return list
-        }
         list.removeAll { it.id == profileId }
+        if (list.isEmpty()) {
+            val def = CustomProfile("default_profile_1", "Tùy chỉnh 1", List(numBands) { 0f })
+            list.add(def)
+        }
         saveCustomProfiles(list)
-        if (activeCustomProfileId == profileId) {
+        if (activeCustomProfileId == profileId || list.none { it.id == activeCustomProfileId }) {
             activeCustomProfileId = list.first().id
         }
         return list

@@ -612,38 +612,51 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isProfileActive) NeonGreen.copy(alpha = 0.25f) else DarkSurfaceVariant)
-                                    .border(1.dp, if (isProfileActive) NeonGreen else Color.Transparent, RoundedCornerShape(8.dp))
-                                    .clickable(enabled = isConnected && isEqEnabled) {
-                                        selectedPreset = "Tùy chỉnh"
-                                        prefs.selectedPreset = "Tùy chỉnh"
-                                        activeProfileId = profile.id
-                                        prefs.activeCustomProfileId = profile.id
-                                        for (idx in profile.gains.indices) {
-                                            if (idx < currentBands.size) currentBands[idx] = profile.gains[idx]
-                                        }
-                                        AudioDspManager.applyGains(currentBands.toFloatArray(), context)
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                    .background(if (isProfileActive) NeonGreen.copy(alpha = 0.22f) else DarkSurfaceVariant)
+                                    .border(1.dp, if (isProfileActive) NeonGreen else Color.Transparent, RoundedCornerShape(8.dp)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = profile.name,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isProfileActive) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isProfileActive) NeonGreen else TextPrimary
-                                )
-                                if (customProfiles.size > 1 && isProfileActive) {
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Xóa",
-                                        tint = NeonRed,
-                                        modifier = Modifier
-                                            .size(13.dp)
-                                            .clickable {
+                                // Profile Name / Click to select
+                                Box(
+                                    modifier = Modifier
+                                        .clickable(enabled = isConnected && isEqEnabled) {
+                                            selectedPreset = "Tùy chỉnh"
+                                            prefs.selectedPreset = "Tùy chỉnh"
+                                            activeProfileId = profile.id
+                                            prefs.activeCustomProfileId = profile.id
+                                            for (idx in profile.gains.indices) {
+                                                if (idx < currentBands.size) currentBands[idx] = profile.gains[idx]
+                                            }
+                                            AudioDspManager.applyGains(currentBands.toFloatArray(), context)
+                                        }
+                                        .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
+                                ) {
+                                    Text(
+                                        text = profile.name,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isProfileActive) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isProfileActive) NeonGreen else TextPrimary
+                                    )
+                                }
+
+                                // Delete Button (Always accessible for each profile)
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clickable(
+                                            enabled = isConnected && isEqEnabled,
+                                            onClick = {
                                                 profileToDelete = profile
                                             }
+                                        )
+                                        .padding(6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Xóa ${profile.name}",
+                                        tint = if (isProfileActive) NeonRed else Color.LightGray.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(13.dp)
                                     )
                                 }
                             }
@@ -886,11 +899,12 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
     // Dialog: Confirm Delete Profile
     if (profileToDelete != null) {
         val prof = profileToDelete!!
+        val isLastOne = customProfiles.size <= 1
         AlertDialog(
             onDismissRequest = { profileToDelete = null },
             title = {
                 Text(
-                    text = "Xóa cấu hình",
+                    text = if (isLastOne) "Đặt lại cấu hình" else "Xóa cấu hình",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = NeonRed
@@ -898,7 +912,10 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
             },
             text = {
                 Text(
-                    text = "Bạn có chắc chắn muốn xóa cấu hình '${prof.name}' không?",
+                    text = if (isLastOne)
+                        "Cấu hình '${prof.name}' là cấu hình duy nhất. Bạn có muốn xóa và đặt lại cấu hình này về mặc định (0 dB) không?"
+                    else
+                        "Bạn có chắc chắn muốn xóa cấu hình '${prof.name}' không?",
                     fontSize = 13.sp,
                     color = TextPrimary
                 )
@@ -914,13 +931,20 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                         for (idx in newActive.gains.indices) {
                             if (idx < currentBands.size) currentBands[idx] = newActive.gains[idx]
                         }
-                        AudioDspManager.applyGains(currentBands.toFloatArray(), context)
+                        if (selectedPreset.equals("Tùy chỉnh", ignoreCase = true)) {
+                            AudioDspManager.applyGains(currentBands.toFloatArray(), context)
+                        }
+                        val deletedName = prof.name
                         profileToDelete = null
-                        Toast.makeText(context, "Đã xóa: ${prof.name}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            if (isLastOne) "Đã đặt lại cấu hình về mặc định!" else "Đã xóa: $deletedName",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonRed)
                 ) {
-                    Text("Xóa", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(if (isLastOne) "Đặt lại" else "Xóa", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             },
             dismissButton = {
