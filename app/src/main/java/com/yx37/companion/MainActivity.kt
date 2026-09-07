@@ -167,7 +167,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
         }
     }
 
-    val presets = listOf("Flat", "Bass Boost", "Treble Boost", "Vocal", "Gaming", "Tùy chỉnh")
+    val presets = listOf("Flat", "Bass Boost", "Treble Boost", "Vocal", "Gaming")
 
     // Permission launcher for Android 12+ (API 31+)
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -538,16 +538,15 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Row 1: Flat, Bass Boost, Treble Boost
-                    Row(
+                    // Single compact line of presets
+                    LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        presets.take(3).forEach { p ->
+                        items(presets) { p ->
                             val isSelected = selectedPreset.equals(p, ignoreCase = true)
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) CyberCyan else DarkSurfaceVariant)
                                     .clickable(enabled = isConnected && isEqEnabled) {
@@ -558,53 +557,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                                             if (idx < currentBands.size) currentBands[idx] = newGains[idx]
                                         }
                                     }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = p,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) DarkBackground else if (isConnected && isEqEnabled) TextPrimary else Color.Gray
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(5.dp))
-
-                    // Row 2: Vocal, Gaming, Tùy chỉnh
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        presets.drop(3).forEach { p ->
-                            val isSelected = selectedPreset.equals(p, ignoreCase = true)
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) (if (p == "Tùy chỉnh") NeonGreen else CyberCyan) else DarkSurfaceVariant)
-                                    .clickable(enabled = isConnected && isEqEnabled) {
-                                        selectedPreset = p
-                                        prefs.selectedPreset = p
-                                        if (p.equals("Tùy chỉnh", ignoreCase = true)) {
-                                            // Restore active custom profile bands WITHOUT wiping them!
-                                            val active = prefs.getActiveCustomProfile(numBands)
-                                            activeProfileId = active.id
-                                            prefs.activeCustomProfileId = active.id
-                                            for (idx in active.gains.indices) {
-                                                if (idx < currentBands.size) currentBands[idx] = active.gains[idx]
-                                            }
-                                            AudioDspManager.applyGains(currentBands.toFloatArray(), context)
-                                        } else {
-                                            val newGains = AudioDspManager.applyPreset(p, context)
-                                            for (idx in newGains.indices) {
-                                                if (idx < currentBands.size) currentBands[idx] = newGains[idx]
-                                            }
-                                        }
-                                    }
-                                    .padding(vertical = 7.dp),
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
