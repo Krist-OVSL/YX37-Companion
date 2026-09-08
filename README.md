@@ -1,4 +1,5 @@
-# YX37 Companion (Android) - v1.1.0
+# YX37 Companion (Android) - v1.2.0
+*By FirmRay*
 
 Ứng dụng Android điều khiển phần cứng và tinh chỉnh Equalizer (EQ) trực tiếp cho tai nghe **YX37** qua kết nối Bluetooth.
 
@@ -14,7 +15,9 @@
   - **Treble Boost**: Tăng độ chi tiết và sáng của dải cao.
   - **Vocal**: Tôn giọng hát và đàm thoại rõ ràng.
   - **Gaming**: Tối ưu âm thanh không gian và tiếng bước chân.
-- **Quản lý đa cấu hình tùy chỉnh (Custom Profiles)**: Tạo mới không giới hạn nhiều cấu hình tùy chỉnh cá nhân, đổi tên, và xóa dễ dàng ngay trên giao diện.
+- **Quản lý đa cấu hình tùy chỉnh (Custom Profiles)**: Tạo mới không giới hạn, **đổi tên linh hoạt**, và xóa dễ dàng ngay trên giao diện.
+- **Chống sụt âm lượng & Bù trừ headroom**: Tích hợp công nghệ định tuyến phiên âm thanh độc quyền và `LoudnessEnhancer`, giữ âm lượng luôn to rõ, uy lực khi bật EQ.
+- **Trung tâm Cài đặt & Thông tin**: Tích hợp nhật ký cập nhật chi tiết từng phiên bản và giấy phép mã nguồn mở MIT License.
 - **Tự động lưu & Khôi phục**: Lưu lại trạng thái tùy chỉnh của bạn và tự động nạp lại mỗi khi tai nghe kết nối.
 - **Giao diện Material 3 hiện đại**: Xây dựng hoàn toàn bằng Jetpack Compose, hiển thị trực quan trạng thái kết nối Bluetooth.
 

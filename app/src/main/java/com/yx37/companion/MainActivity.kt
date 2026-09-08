@@ -145,6 +145,9 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
     var showCreateProfileDialog by remember { mutableStateOf(false) }
     var newProfileNameInput by remember { mutableStateOf("") }
     var profileToDelete by remember { mutableStateOf<CustomProfile?>(null) }
+    var profileToRename by remember { mutableStateOf<CustomProfile?>(null) }
+    var renameInput by remember { mutableStateOf("") }
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     fun formatFreq(hz: Int): String {
         return if (hz >= 1000) {
@@ -287,19 +290,23 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                             text = "🎧  YX37 COMPANION",
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.1.sp,
-                            fontSize = 16.sp,
+                            fontSize = 17.sp,
                             color = CyberCyan
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "v1.1.0",
-                            fontSize = 10.sp,
-                            color = TextSecondary,
-                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 },
                 actions = {
+                    // Settings & Info Button
+                    IconButton(
+                        onClick = { showSettingsDialog = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Cài đặt & Thông tin",
+                            tint = CyberCyan
+                        )
+                    }
+
                     // Manual Refresh Button
                     IconButton(
                         onClick = {
@@ -636,7 +643,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                                             }
                                             AudioDspManager.applyGains(currentBands.toFloatArray(), context)
                                         }
-                                        .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
+                                        .padding(start = 10.dp, end = 2.dp, top = 6.dp, bottom = 6.dp)
                                 ) {
                                     Text(
                                         text = profile.name,
@@ -646,7 +653,29 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                                     )
                                 }
 
-                                // Delete Button (Always accessible for each profile)
+                                // Rename Button
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clickable(
+                                            enabled = isConnected && isEqEnabled,
+                                            onClick = {
+                                                renameInput = profile.name
+                                                profileToRename = profile
+                                            }
+                                        )
+                                        .padding(6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Đổi tên ${profile.name}",
+                                        tint = if (isProfileActive) CyberCyan else Color.LightGray.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+
+                                // Delete Button
                                 Box(
                                     modifier = Modifier
                                         .size(28.dp)
@@ -832,16 +861,7 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "YX37 Companion v1.1.0 • By Krist-OVSL",
-                fontSize = 10.sp,
-                color = TextSecondary.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            )
+
         }
     }
 
@@ -968,6 +988,253 @@ fun DashboardScreen(prefs: PreferencesManager, monitor: BluetoothMonitor) {
             dismissButton = {
                 TextButton(onClick = { profileToDelete = null }) {
                     Text("Hủy", color = Color.Gray, fontSize = 12.sp)
+                }
+            },
+            containerColor = DarkSurface
+        )
+    }
+    // Dialog: Rename Custom Profile
+    if (profileToRename != null) {
+        val prof = profileToRename!!
+        AlertDialog(
+            onDismissRequest = { profileToRename = null },
+            title = {
+                Text(
+                    text = "Đổi tên cấu hình",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Nhập tên mới cho cấu hình tùy chỉnh:",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = renameInput,
+                        onValueChange = { renameInput = it },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val clean = renameInput.trim()
+                        if (clean.isNotEmpty()) {
+                            val updated = prefs.renameCustomProfile(prof.id, clean, numBands)
+                            customProfiles.clear()
+                            customProfiles.addAll(updated)
+                            Toast.makeText(context, "Đã đổi tên thành: $clean", Toast.LENGTH_SHORT).show()
+                        }
+                        profileToRename = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+                ) {
+                    Text("Lưu", color = DarkBackground, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { profileToRename = null }) {
+                    Text("Hủy", color = Color.Gray, fontSize = 12.sp)
+                }
+            },
+            containerColor = DarkSurface
+        )
+    }
+
+    // Dialog: Settings, Changelog & License
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = CyberCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Cài đặt & Thông tin",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 440.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // App Info Card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(DarkSurfaceVariant)
+                            .padding(12.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(
+                                text = "🎧 YX37 Companion",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CyberCyan
+                            )
+                            Text(
+                                text = "Phiên bản: 1.2.0 (Build 3)",
+                                fontSize = 12.sp,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Tác giả: By FirmRay",
+                                fontSize = 12.sp,
+                                color = NeonGreen,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    // Changelog Section
+                    Text(
+                        text = "📋 Nhật ký cập nhật (Changelog)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CyberCyan
+                    )
+
+                    // v1.2.0
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSurfaceVariant.copy(alpha = 0.6f))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = "• v1.2.0 (Bản hiện tại)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonGreen
+                        )
+                        Text(
+                            text = """- Thêm trung tâm Cài đặt & Thông tin chi tiết.
+- Bổ sung tính năng đổi tên cấu hình EQ tùy chỉnh.
+- Khắc phục triệt để lỗi sụt âm lượng (chống xử lý kép & tích hợp bù trừ LoudnessEnhancer).
+- Tối ưu giao diện chính, loại bỏ số phiên bản trên màn hình chính.
+- Cập nhật tác giả: By FirmRay.""",
+                            fontSize = 11.sp,
+                            color = TextSecondary,
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    // v1.1.0
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSurfaceVariant.copy(alpha = 0.6f))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = "• v1.1.0",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = """- Cho phép tạo nhiều cấu hình EQ tùy chỉnh cá nhân.
+- Bổ sung nút xóa cấu hình riêng biệt có hộp thoại xác nhận.
+- Thu gọn khoảng trống thanh trượt 5 dải tần số.
+- Chuẩn hóa khóa ký phát hành vĩnh viễn (Release Keystore).""",
+                            fontSize = 11.sp,
+                            color = TextSecondary,
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    // v1.0.0
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSurfaceVariant.copy(alpha = 0.6f))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = "• v1.0.0",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = """- Bản phát hành đầu tiên hỗ trợ điều khiển Hardware EQ cho tai nghe YX37.
+- Đồng bộ dải tần phần cứng thực tế và 5 preset âm thanh chuẩn.
+- Dịch vụ Audio DSP nền cho Spotify, YouTube & Game.""",
+                            fontSize = 11.sp,
+                            color = TextSecondary,
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    // License Section
+                    Text(
+                        text = "📄 Giấy phép (License)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CyberCyan
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSurfaceVariant.copy(alpha = 0.6f))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = """MIT License
+Copyright (c) 2026 FirmRay
+
+Phần mềm mã nguồn mở hoàn toàn miễn phí. Được cấp phép sử dụng, sao chép, sửa đổi và phân phối tự do theo các điều khoản của giấy phép MIT.""",
+                            fontSize = 10.sp,
+                            color = TextSecondary,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showSettingsDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyberCyan)
+                ) {
+                    Text("Đóng", color = DarkBackground, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             },
             containerColor = DarkSurface
