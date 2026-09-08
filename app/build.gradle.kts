@@ -27,6 +27,8 @@ android {
             storePassword = "yx37companion2026"
             keyAlias = "yx37_release_key"
             keyPassword = "yx37companion2026"
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 
