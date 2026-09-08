@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.audiofx.AudioEffect
 import android.media.audiofx.Equalizer
+import android.media.audiofx.LoudnessEnhancer
 import android.util.Log
 import com.yx37.companion.data.PreferencesManager
 import java.util.concurrent.ConcurrentHashMap
@@ -32,8 +33,17 @@ object AudioDspManager {
     val maxGainDb: Float
         get() = maxMillibels / 100f
 
+    private data class SessionHolder(
+        val equalizer: Equalizer,
+        val loudnessEnhancer: LoudnessEnhancer?
+    )
+
     private var globalEqualizer: Equalizer? = null
-    private val sessionEqualizers = ConcurrentHashMap<Int, Equalizer>()
+    private var globalLoudness: LoudnessEnhancer? = null
+
+    // Track active media player sessions (e.g. Spotify, YouTube)
+    // Clean up older sessions to prevent dead effect accumulation in AudioFlinger
+    private val sessionHolders = ConcurrentHashMap<Int, SessionHolder>()
 
     var isEqMasterEnabled: Boolean = true
         private set
@@ -59,7 +69,7 @@ object AudioDspManager {
                 currentGains = calculatePresetGains(selected, hardwareBandFreqs)
             }
 
-            // Try gentle global session init without throwing
+            // Init global session 0 fallback safely
             initGlobalSession(context)
 
             isInitialized = true
@@ -126,8 +136,31 @@ object AudioDspManager {
         if (sessionId <= 0) return
         Log.i(TAG, "Audio session opened by media player: $sessionId")
         try {
-            if (!sessionEqualizers.containsKey(sessionId)) {
+            // Prune dead sessions: Media players only have one active playback stream.
+            // Release any older session to prevent AudioFlinger from running out of effect resources
+            if (sessionHolders.size >= 1 && !sessionHolders.containsKey(sessionId)) {
+                val iterator = sessionHolders.entries.iterator()
+                while (iterator.hasNext()) {
+                    val entry = iterator.next()
+                    try {
+                        entry.value.equalizer.release()
+                        entry.value.loudnessEnhancer?.release()
+                    } catch (t: Throwable) {
+                        // ignore
+                    }
+                    iterator.remove()
+                }
+            }
+
+            if (!sessionHolders.containsKey(sessionId)) {
                 val eq = Equalizer(1000, sessionId)
+                val le = try {
+                    LoudnessEnhancer(sessionId).apply {
+                        setTargetGain(200) // +2.0 dB headroom compensation
+                    }
+                } catch (t: Throwable) {
+                    null
+                }
 
                 // Probe real hardware bands safely from an actual active session!
                 try {
@@ -152,8 +185,9 @@ object AudioDspManager {
                     Log.w(TAG, "Could not query band metadata: ${t.message}")
                 }
 
-                sessionEqualizers[sessionId] = eq
-                applyToSingleEqualizer(eq)
+                val holder = SessionHolder(eq, le)
+                sessionHolders[sessionId] = holder
+                applyToAllActiveSessions()
             }
         } catch (t: Throwable) {
             Log.w(TAG, "Failed to attach Equalizer to session $sessionId: ${t.message}")
@@ -163,7 +197,11 @@ object AudioDspManager {
     fun onSessionClose(sessionId: Int) {
         if (sessionId <= 0) return
         try {
-            sessionEqualizers.remove(sessionId)?.release()
+            val holder = sessionHolders.remove(sessionId)
+            holder?.equalizer?.release()
+            holder?.loudnessEnhancer?.release()
+            // When specific session closes, re-apply so global session 0 takes over seamlessly
+            applyToAllActiveSessions()
         } catch (t: Throwable) {
             // ignore
         }
@@ -173,7 +211,12 @@ object AudioDspManager {
         try {
             if (globalEqualizer == null) {
                 globalEqualizer = Equalizer(1000, 0)
-                applyToSingleEqualizer(globalEqualizer)
+                globalLoudness = try {
+                    LoudnessEnhancer(0).apply { setTargetGain(200) }
+                } catch (t: Throwable) {
+                    null
+                }
+                applyToAllActiveSessions()
             }
         } catch (t: Throwable) {
             Log.w(TAG, "Global session 0 not permitted on this ROM: ${t.message}")
@@ -191,23 +234,59 @@ object AudioDspManager {
     }
 
     private fun applyToAllActiveSessions() {
-        globalEqualizer?.let { applyToSingleEqualizer(it) }
+        val shouldEnable = isHeadsetConnected && isEqMasterEnabled
+        val hasActiveAppSession = sessionHolders.isNotEmpty()
 
-        for ((_, eq) in sessionEqualizers) {
-            applyToSingleEqualizer(eq)
+        // 1. Global Session 0 is active ONLY when NO specific app session is active!
+        // This completely prevents Double Processing where sound gets attenuated twice (-12dB) and phase-distorted!
+        globalEqualizer?.let { eq ->
+            try {
+                val enableGlobal = shouldEnable && !hasActiveAppSession
+                if (eq.enabled != enableGlobal) {
+                    eq.enabled = enableGlobal
+                }
+                if (enableGlobal) {
+                    applyBandsToEqualizer(eq)
+                    globalLoudness?.let { le ->
+                        if (!le.enabled) le.enabled = true
+                        le.setTargetGain(200)
+                    }
+                } else {
+                    globalLoudness?.let { le ->
+                        if (le.enabled) le.enabled = false
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "Error applying global equalizer", t)
+            }
+        }
+
+        // 2. Specific App Sessions (Spotify, YouTube, Media Players)
+        for ((_, holder) in sessionHolders) {
+            try {
+                val eq = holder.equalizer
+                if (eq.enabled != shouldEnable) {
+                    eq.enabled = shouldEnable
+                }
+                if (shouldEnable) {
+                    applyBandsToEqualizer(eq)
+                    holder.loudnessEnhancer?.let { le ->
+                        if (!le.enabled) le.enabled = true
+                        le.setTargetGain(200) // Compensate for Android's negative EQ headroom cut
+                    }
+                } else {
+                    holder.loudnessEnhancer?.let { le ->
+                        if (le.enabled) le.enabled = false
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "Error applying session equalizer", t)
+            }
         }
     }
 
-    private fun applyToSingleEqualizer(eq: Equalizer?) {
-        if (eq == null) return
+    private fun applyBandsToEqualizer(eq: Equalizer) {
         try {
-            val shouldEnable = isHeadsetConnected && isEqMasterEnabled
-            if (eq.enabled != shouldEnable) {
-                eq.enabled = shouldEnable
-            }
-
-            if (!shouldEnable) return
-
             val numBands = eq.numberOfBands.toInt()
             val range = eq.bandLevelRange
             val minL = range[0].toInt()
@@ -219,7 +298,7 @@ object AudioDspManager {
                 eq.setBandLevel(b.toShort(), millibels)
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "Error applying band level: ${t.message}")
+            Log.e(TAG, "Error setting band level: ${t.message}")
         }
     }
 
@@ -280,10 +359,13 @@ object AudioDspManager {
         try {
             globalEqualizer?.release()
             globalEqualizer = null
-            for (eq in sessionEqualizers.values) {
-                eq.release()
+            globalLoudness?.release()
+            globalLoudness = null
+            for ((_, holder) in sessionHolders) {
+                holder.equalizer.release()
+                holder.loudnessEnhancer?.release()
             }
-            sessionEqualizers.clear()
+            sessionHolders.clear()
             isInitialized = false
         } catch (t: Throwable) {
             // ignore
